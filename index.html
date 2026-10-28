@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="多人碼表">
+<meta name="theme-color" content="#000000">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<title>多人碼表</title>
+<style>
+  :root{
+    --bg:#000; --fg:#fff; --dim:#8e8e93; --line:#2c2c2e;
+    --gray:#333335; --green:#30d158; --green-bg:#0a2a12;
+    --red:#ff453a; --red-bg:#330e0c;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);
+    font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Helvetica Neue","PingFang TC","Noto Sans TC",sans-serif}
+  body{display:flex;flex-direction:column;max-width:560px;margin:0 auto;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);user-select:none;-webkit-user-select:none}
+  .main{padding:28px 20px 8px;text-align:center}
+  #clock{font-size:clamp(56px,19vw,92px);font-weight:200;font-variant-numeric:tabular-nums;letter-spacing:-1px;line-height:1.1}
+  .controls{display:flex;justify-content:space-between;padding:12px 20px 18px;border-bottom:1px solid var(--line)}
+  .round{width:82px;height:82px;border-radius:50%;border:none;font-size:17px;font-family:inherit;cursor:pointer;position:relative}
+  .round::after{content:"";position:absolute;inset:3px;border-radius:50%;border:2px solid #000}
+  .round.gray{background:var(--gray);color:#fff}
+  .round.green{background:var(--green-bg);color:var(--green)}
+  .round.red{background:var(--red-bg);color:var(--red)}
+  .round:active{filter:brightness(1.4)}
+  .round:disabled{opacity:.4}
+  #list{flex:1;overflow-y:auto;padding:0 16px 24px;-webkit-overflow-scrolling:touch}
+  .item{border-bottom:1px solid var(--line)}
+  .row{display:flex;align-items:center;gap:10px;padding:10px 0;min-height:78px}
+  .rank{width:22px;font-size:15px;color:var(--dim);text-align:center;font-variant-numeric:tabular-nums;flex:none}
+  .who{flex:1;min-width:0}
+  .who input{width:100%;background:transparent;border:none;color:var(--fg);font:inherit;font-size:17px;padding:2px 0;outline:none;user-select:text;-webkit-user-select:text}
+  .who input::placeholder{color:var(--dim)}
+  .t{font-size:26px;font-weight:300;font-variant-numeric:tabular-nums;color:var(--dim);white-space:nowrap}
+  .lapinfo{font-size:13px;color:var(--dim);font-variant-numeric:tabular-nums;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
+  .lapinfo:empty{display:none}
+  .row.running .t{color:var(--fg)}
+  .row.done .t{color:var(--fg);font-weight:400}
+  .row.first .t{color:var(--green)}
+  .btns{display:flex;gap:8px;flex:none}
+  .btn{width:58px;height:58px;border-radius:50%;border:none;font-size:15px;font-family:inherit;cursor:pointer;flex:none}
+  .btn.stop{background:var(--red-bg);color:var(--red)}
+  .btn.lap{background:var(--gray);color:#fff}
+  .btn.undo{background:var(--gray);color:#fff;font-size:13px}
+  .btn.del{background:transparent;color:var(--dim);font-size:22px;width:44px;height:44px}
+  .btn:active{filter:brightness(1.4)}
+  .btn:disabled{opacity:.35}
+  .laps{padding:0 0 10px 32px;display:none}
+  .item.open .laps{display:block}
+  .lp{display:flex;justify-content:space-between;font-size:15px;padding:7px 0;border-top:1px solid #1c1c1e;font-variant-numeric:tabular-nums}
+  .lp span:first-child{color:var(--dim);width:64px}
+  .lp span:nth-child(2){flex:1}
+  .lp span:last-child{color:var(--dim)}
+  .lp.best span:nth-child(2){color:var(--green)}
+  .lp.worst span:nth-child(2){color:var(--red)}
+  .lp.cur span{color:var(--dim)!important}
+  .dellap{background:none;border:none;color:var(--red);font-size:14px;font-family:inherit;padding:8px 0;cursor:pointer}
+  #modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;padding:24px}
+  #modal.show{display:flex}
+  .box{background:#1c1c1e;border-radius:14px;width:100%;max-width:300px;text-align:center;overflow:hidden}
+  .box p{margin:0;padding:20px 16px;font-size:16px;line-height:1.4}
+  .box .acts{display:flex;border-top:1px solid #38383a}
+  .box button{flex:1;background:none;border:none;color:#0a84ff;font-size:17px;padding:13px;font-family:inherit;cursor:pointer}
+  .box button+button{border-left:1px solid #38383a}
+  .box button.danger{color:var(--red);font-weight:600}
+  .addrow{display:block;width:100%;margin-top:14px;padding:16px;background:#1c1c1e;border:none;border-radius:12px;color:#0a84ff;font-size:17px;font-family:inherit;cursor:pointer}
+  .addrow:active{filter:brightness(1.4)}
+  .hint{color:var(--dim);font-size:13px;text-align:center;padding:16px 0;line-height:1.6}
+</style>
+</head>
+<body>
+  <div class="main"><div id="clock">00:00.00</div></div>
+  <div class="controls">
+    <button class="round gray" id="left">新增</button>
+    <button class="round green" id="right">開始</button>
+  </div>
+  <div id="list"></div>
+  <div id="modal"><div class="box">
+    <p>要清除所有成績並重設嗎？</p>
+    <div class="acts"><button id="mno">取消</button><button id="myes" class="danger">重設</button></div>
+  </div></div>
+
+<script>
+(function(){
+  var KEY = 'multi-stopwatch-v1';
+  // state.start = epoch ms or null
+  // runner: {id, name, end (ms or null), laps: [cumulative ms of each lap press]}
+  var state = load() || {start:null, runners:[], seq:0};
+  state.runners.forEach(function(r){ if(!r.laps) r.laps=[]; });
+  if (!state.runners.length) { for (var i=0;i<5;i++) addRunner(true); }
+  var open = {};   // id -> expanded
+  var live = [];   // refs for running rows
+
+  var $ = function(id){return document.getElementById(id)};
+  var clock=$('clock'), list=$('list'), left=$('left'), right=$('right');
+
+  function load(){ try{ var s=JSON.parse(localStorage.getItem(KEY)); if(s&&s.runners) return s; }catch(e){} return null; }
+  function save(){ try{ localStorage.setItem(KEY, JSON.stringify(state)); }catch(e){} }
+
+  function addRunner(silent){
+    state.seq++;
+    state.runners.push({id:state.seq, name:'', end:null, laps:[]});
+    if(!silent){ save(); render(); setTimeout(function(){ list.scrollTop=list.scrollHeight; },0); }
+  }
+
+  function fmt(ms){
+    if (ms<0) ms=0;
+    var cs=Math.floor(ms/10)%100, s=Math.floor(ms/1000)%60, m=Math.floor(ms/60000)%60, h=Math.floor(ms/3600000);
+    var p=function(n){return (n<10?'0':'')+n};
+    return (h? h+':'+p(m) : p(m)) + ':' + p(s) + '.' + p(cs);
+  }
+  function fmtS(ms){ // compact: 1:05.32 / 45.10
+    var f=fmt(ms);
+    if(f.indexOf(':')===f.lastIndexOf(':')) f=f.replace(/^0/,'').replace(/^0:/,'').replace(/^0(\d)/,'$1');
+    return f;
+  }
+  function elapsed(){ return state.start==null ? 0 : (state.pausedAt||Date.now())-state.start; }
+  function label(r,i){ return r.name.trim() || ('選手 '+(i+1)); }
+
+  // Split times of completed laps. If finished and has laps, the final segment counts as the last lap.
+  function splits(r){
+    var cum = r.laps.slice();
+    if(r.end!=null && cum.length && r.end>cum[cum.length-1]) cum.push(r.end);
+    return cum.map(function(c,i){ return c-(i?cum[i-1]:0); });
+  }
+  function lastLapCum(r){ return r.laps.length ? r.laps[r.laps.length-1] : 0; }
+
+  function ranks(){
+    var done = state.runners.filter(function(r){return r.end!=null}).slice().sort(function(a,b){return a.end-b.end});
+    var map={}; done.forEach(function(r,i){ map[r.id]=i+1; }); return map;
+  }
+  function allDone(){ return state.runners.length && state.runners.every(function(r){return r.end!=null}); }
+
+  function lapSummary(r, e){
+    if(!r.laps.length) return '';
+    var sp=splits(r);
+    if(r.end==null){
+      return '第'+(r.laps.length+1)+'圈 '+fmtS(e-lastLapCum(r))+' · 上圈 '+fmtS(sp[sp.length-1])+(open[r.id]?' ▴':' ▾');
+    }
+    var best=Math.min.apply(null,sp);
+    return sp.length+'圈 · 最快 '+fmtS(best)+(open[r.id]?' ▴':' ▾');
+  }
+
+  function render(){
+    var started = state.start!=null;
+    var rk = ranks(), e = elapsed();
+    list.innerHTML=''; live=[];
+    state.runners.forEach(function(r,i){
+      var item=document.createElement('div'); item.className='item'+(open[r.id]?' open':'');
+      var row=document.createElement('div');
+      row.className='row '+(r.end!=null?'done':(started?'running':''))+(rk[r.id]===1?' first':'');
+      item.appendChild(row);
+
+      var rank=document.createElement('div'); rank.className='rank';
+      rank.textContent = rk[r.id] || '';
+      row.appendChild(rank);
+
+      var who=document.createElement('div'); who.className='who';
+      var inp=document.createElement('input'); inp.value=r.name; inp.placeholder='選手 '+(i+1);
+      inp.addEventListener('input',function(){ r.name=inp.value; save(); });
+      who.appendChild(inp);
+      var t=document.createElement('div'); t.className='t';
+      t.textContent = r.end!=null ? fmt(r.end) : fmt(e);
+      who.appendChild(t);
+      var li=document.createElement('div'); li.className='lapinfo';
+      li.textContent=lapSummary(r,e);
+      li.onclick=function(){ open[r.id]=!open[r.id]; render(); };
+      who.appendChild(li);
+      row.appendChild(who);
+
+      var btns=document.createElement('div'); btns.className='btns';
+      if(!started){
+        var d=document.createElement('button'); d.className='btn del'; d.textContent='✕';
+        d.onclick=function(){ state.runners=state.runners.filter(function(x){return x!==r}); save(); render(); };
+        if(state.runners.length<=1) d.style.visibility='hidden';
+        btns.appendChild(d);
+      } else if(r.end==null){
+        var l=document.createElement('button'); l.className='btn lap'; l.textContent='計圈';
+        l.onclick=function(){
+          var now=elapsed();
+          if(now-lastLapCum(r)<800) return;   // ignore accidental double-tap
+          r.laps.push(now); vibrate(); save(); render();
+        };
+        var s=document.createElement('button'); s.className='btn stop'; s.textContent='停止';
+        s.onclick=function(){ r.end=elapsed(); r.stoppedAt=Date.now(); vibrate(); save(); render(); };
+        if(state.pausedAt){ l.disabled=true; s.disabled=true; }
+        btns.appendChild(l); btns.appendChild(s);
+        live.push({r:r, t:t, li:li});
+      } else {
+        var u=document.createElement('button'); u.className='btn undo'; u.textContent='復原';
+        u.onclick=function(){ if(Date.now()-(r.stoppedAt||0)<1000) return; r.end=null; save(); render(); };
+        btns.appendChild(u);
+      }
+      row.appendChild(btns);
+
+      // expanded lap list
+      if(r.laps.length){
+        var box=document.createElement('div'); box.className='laps';
+        var sp=splits(r);
+        var best=Math.min.apply(null,sp), worst=Math.max.apply(null,sp);
+        var cum=0, rowsHtml=[];
+        sp.forEach(function(v,k){
+          cum+=v;
+          var cls = sp.length>1 ? (v===best?' best':(v===worst?' worst':'')) : '';
+          rowsHtml.push('<div class="lp'+cls+'"><span>第'+(k+1)+'圈</span><span>'+fmt(v)+'</span><span>'+fmt(cum)+'</span></div>');
+        });
+        if(r.end==null){
+          rowsHtml.push('<div class="lp cur"><span>第'+(sp.length+1)+'圈</span><span class="curlap">'+fmt(e-lastLapCum(r))+'</span><span>進行中</span></div>');
+        }
+        box.innerHTML=rowsHtml.reverse().join('');
+        if(r.end==null){
+          var dl=document.createElement('button'); dl.className='dellap'; dl.textContent='刪除最後一次計圈';
+          dl.onclick=function(){ r.laps.pop(); save(); render(); };
+          box.appendChild(dl);
+        }
+        item.appendChild(box);
+        if(r.end==null) live[live.length-1].cur=box.querySelector('.curlap');
+      }
+      list.appendChild(item);
+    });
+
+    var add=document.createElement('button'); add.className='addrow';
+    add.textContent='＋ 新增選手';
+    add.onclick=function(){ addRunner(); };
+    list.appendChild(add);
+    if(!started){
+      var h=document.createElement('div'); h.className='hint';
+      h.textContent='點名字可輸入姓名 · 按「開始」所有人同時起跑\n點選手下方的圈數可展開每圈時間';
+      h.style.whiteSpace='pre-line';
+      list.appendChild(h);
+    }
+
+    if(!started){
+      left.textContent='新增'; left.className='round gray';
+      right.textContent='開始'; right.className='round green'; right.disabled=false;
+    } else if(state.pausedAt){
+      left.textContent='重設'; left.className='round gray';
+      right.textContent='繼續'; right.className='round green'; right.disabled=false;
+    } else if(!allDone()){
+      left.textContent='重設'; left.className='round gray';
+      right.textContent='暫停'; right.className='round red'; right.disabled=false;
+    } else {
+      left.textContent='重設'; left.className='round gray';
+      right.textContent='暫停'; right.className='round red'; right.disabled=true;
+    }
+    tick();
+  }
+
+  function tick(){
+    var e=elapsed();
+    if(state.start!=null && allDone()){
+      clock.textContent=fmt(Math.max.apply(null,state.runners.map(function(r){return r.end})));
+      return;
+    }
+    clock.textContent=fmt(e);
+    for(var i=0;i<live.length;i++){
+      var x=live[i];
+      x.t.textContent=fmt(e);
+      if(x.r.laps.length) x.li.textContent=lapSummary(x.r,e);
+      if(x.cur) x.cur.textContent=fmt(e-lastLapCum(x.r));
+    }
+  }
+  (function loop(){ tick(); requestAnimationFrame(loop); })();
+
+  left.onclick=function(){
+    if(state.start==null){ addRunner(); return; }
+    $('modal').classList.add('show');
+  };
+  $('mno').onclick=function(){ $('modal').classList.remove('show'); };
+  $('myes').onclick=function(){
+    $('modal').classList.remove('show');
+    state.start=null; state.pausedAt=null; open={};
+    state.runners.forEach(function(r){r.end=null; r.laps=[];}); save(); render();
+  };
+  right.onclick=function(){
+    if(state.start==null){
+      state.start=Date.now(); vibrate(); keepAwake(); save(); render(); return;
+    }
+    if(state.pausedAt){
+      state.start += Date.now()-state.pausedAt; state.pausedAt=null;
+      vibrate(); keepAwake(); save(); render(); return;
+    }
+    if(allDone()) return;
+    state.pausedAt=Date.now(); vibrate(); save(); render();
+  };
+
+  function vibrate(){ try{ navigator.vibrate && navigator.vibrate(30); }catch(e){} }
+  function keepAwake(){ try{ if(navigator.wakeLock) navigator.wakeLock.request('screen').catch(function(){}); }catch(e){} }
+  document.addEventListener('visibilitychange',function(){ if(document.visibilityState==='visible' && state.start!=null && !allDone()) keepAwake(); });
+
+  if(state.start!=null && !allDone()) keepAwake();
+  save(); render();
+  if('serviceWorker' in navigator){ try{ navigator.serviceWorker.register('sw.js').catch(function(){}); }catch(e){} }
+})();
+</script>
+</body>
+</html>
